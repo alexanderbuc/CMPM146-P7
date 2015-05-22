@@ -2,9 +2,10 @@ __author__ = 'Alexander'
 import subprocess
 import json
 import collections
+import random
 import sys
 
-# copy/pasted a bunch of helper functions
+# copy pasta
 def solve(*args):
     """Run clingo with the provided argument list and return the parsed JSON result."""
 
@@ -20,7 +21,7 @@ def solve(*args):
 
     return parse_json_result(out)
 
-# copy/pasta
+
 def parse_json_result(out):
     """Parse the provided JSON text and extract a dict
     representing the predicates described in the first solver result."""
@@ -45,15 +46,22 @@ def parse_json_result(out):
             functor = atom[:left]
             arg_string = atom[left:]
             try:
-                preds[functor].add( eval(arg_string, env) )
+                preds[functor].add(eval(arg_string, env))
             except TypeError:
-                pass # at least we tried...
+                pass  # at least we tried...
 
         else:
             preds[atom] = True
 
     return dict(preds)
-# copy/pasta
+
+
+def solve_randomly(*args):
+    """Like solve() but uses a random sign heuristic with a random seed."""
+    args = list(args) + ["--sign-def=3", "--seed=" + str(random.randint(0, 1 << 30))]
+    return solve(*args)
+
+
 def render_ascii_dungeon(design):
     """Given a dict of predicates, return an ASCII-art depiction of the a dungeon."""
 
@@ -61,9 +69,11 @@ def render_ascii_dungeon(design):
     param = dict(design['param'])
     width = param['width']
     glyph = dict(space='.', wall='W', altar='a', gem='g', trap='_')
-    block = ''.join([''.join([glyph[sprite.get((r,c),'space')]+' ' for c in range(width)])+'\n' for r in range(width)])
+    block = ''.join(
+        [''.join([glyph[sprite.get((r, c), 'space')] + ' ' for c in range(width)]) + '\n' for r in range(width)])
     return block
-# copy/pasta
+
+
 def render_ascii_touch(design, target):
     """Given a dict of predicates, return an ASCII-art depiction where the player explored
     while in the `target` state."""
@@ -74,9 +84,10 @@ def render_ascii_touch(design, target):
             touch[cell] = str(target)
     param = dict(design['param'])
     width = param['width']
-    block = ''.join([''.join([str(touch[r,c])+' ' for c in range(width)])+'\n' for r in range(width)])
+    block = ''.join([''.join([str(touch[r, c]) + ' ' for c in range(width)]) + '\n' for r in range(width)])
     return block
-# copy/pasta
+
+
 def side_by_side(*blocks):
     """Horizontally merge two ASCII-art pictures."""
 
@@ -85,8 +96,14 @@ def side_by_side(*blocks):
         lines.append(' '.join(tup))
     return '\n'.join(lines)
 
-# adapted from textbook
-# get command line arguments, parse the json given, and print the given dungeon
-stuff = open(sys.argv[1]).read().replace('\n', '')
-dungeon = parse_json_result(stuff)
-print (render_ascii_dungeon(dungeon))
+# end copy pasta
+if __name__ == '__main__':
+    # adapted from solve(), i listed the command in one line because it broke otherwise
+    clingo = subprocess.Popen(
+        "gringo level-core.lp level-style.lp level-sim.lp level-shortcuts.lp | reify | clingo - meta.lp metaD.lp metaO.lp metaS.lp --parallel-mode=4 --outf=2",
+        shell = True, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    out, err = clingo.communicate()
+    if err:
+        print err
+        dungeon = parse_json_result(out)
+        print render_ascii_dungeon(dungeon)
